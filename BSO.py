@@ -9,17 +9,11 @@ class BSOAlgorithm:
     def sigmoid(x):
         return (1/(1 + math.exp(-x)))
 
-#     def svrCheck(X_train, y_train, X_val, y_val, sol):
-#         clf = NuSVR(kernel = 'linear', gamma = 'auto', C = sol[0], nu = sol[1])
-#         clf.fit(X_train, y_train)
-#         y_pred = clf.predict(X_val)
-#     #     return (mean_squared_error(y_val, y_pred))
-#         return (mse(y_val, y_pred))
-    
-    def modelCheck(model, X_train, y_train, X_val, y_val, sol):
-        model.set_params(**sol)
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_val)
+    def svrCheck(X_train, y_train, X_val, y_val, sol):
+        clf = NuSVR(kernel = 'linear', gamma = 'auto', C = sol[0], nu = sol[1])
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_val)
+    #     return (mean_squared_error(y_val, y_pred))
         return (mse(y_val, y_pred))
 
     # Brain Storm Optimization,BSO,脑风暴优化算法
@@ -33,7 +27,6 @@ class BSOAlgorithm:
             S.append(l)
     #     S = np.random.rand(n, d)
         return S
-    
 
     def clustProbGen(clus, n, m):
         clus = list(clus)
@@ -71,13 +64,13 @@ class BSOAlgorithm:
             x[i] = (r * x1[i]) + ((1-r) * x2[i])
         return x
 
-    def selClustCenters(model, X_train, y_train, X_val, y_val, S, lab, m):
+    def selClustCenters(X_train, y_train, X_val, y_val, S, lab, m):
         err = []
         cC = [[0,0]]*m
         cE = [9999999]*m
         best = 0
         for i in S:
-                err.append(BSOAlgorithm.modelCheck(model, X_train, y_train, X_val, y_val, i))
+                err.append(BSOAlgorithm.svrCheck(X_train, y_train, X_val, y_val, i))
         j = 0
         for i in lab:
             if(err[j] < cE[i]):
@@ -88,7 +81,7 @@ class BSOAlgorithm:
             j += 1
         return cC, best
 
-    def bso(model, X_train, y_train, X_val, y_val, n, m):
+    def bso(X_train, y_train, X_val, y_val, n, m):
         '''
             参数：
             X_train: 训练集特征数据
@@ -117,7 +110,7 @@ class BSOAlgorithm:
             #clust = AgglomerativeClustering(n_clusters = m).fit(Solutions) 
             prob = BSOAlgorithm.clustProbGen(clust.labels_, n, m) # 根据聚类结果计算每个解属于每个聚类的概率，得到 prob 对象
             #print(clust.labels_)
-            cCenters, best = BSOAlgorithm.selClustCenters(model, X_train, y_train, X_val, y_val, Solutions, clust.labels_, m) # 根据聚类结果和概率选择聚类中心和最佳解
+            cCenters, best = BSOAlgorithm.selClustCenters(X_train, y_train, X_val, y_val, Solutions, clust.labels_, m) # 根据聚类结果和概率选择聚类中心和最佳解
             #print(svrCheck(X_train, y_train, X_val, y_val, Solutions[cCenters[best]]))
             if(BSOAlgorithm.probCheck(pClustering)):    # 如果满足聚类的概率 pClustering，随机选择一个聚类中心，用新生成的解替换该聚类中心的解
                 index = rn.choice(cCenters)
@@ -156,16 +149,16 @@ class BSOAlgorithm:
                         index1 = Solutions.index(sel1)
                         index2 = Solutions.index(sel2)
                 if(flag == 1):
-                    if(BSOAlgorithm.modelCheck(model, X_train, y_train, X_val, y_val, new) < BSOAlgorithm.modelCheck(model, X_train, y_train, X_val, y_val, Solutions[index])):
+                    if(BSOAlgorithm.svrCheck(X_train, y_train, X_val, y_val, new) < BSOAlgorithm.svrCheck(X_train, y_train, X_val, y_val, Solutions[index])):
                         Solutions[index] = new
                 elif(flag == 2):
-                    if(BSOAlgorithm.modelCheck(model, X_train, y_train, X_val, y_val, new) < BSOAlgorithm.modelCheck(model, X_train, y_train, X_val, y_val, Solutions[index1])):
+                    if(BSOAlgorithm.svrCheck(X_train, y_train, X_val, y_val, new) < BSOAlgorithm.svrCheck(X_train, y_train, X_val, y_val, Solutions[index1])):
                         Solutions[index1] = new
-                    elif(BSOAlgorithm.modelCheck(model, X_train, y_train, X_val, y_val, new) < BSOAlgorithm.modelCheck(model, X_train, y_train, X_val, y_val, Solutions[index2])):
+                    elif(BSOAlgorithm.svrCheck(X_train, y_train, X_val, y_val, new) < BSOAlgorithm.svrCheck(X_train, y_train, X_val, y_val, Solutions[index2])):
                         Solutions[index2] = new 
 
-        cCenters, best = BSOAlgorithm.selClustCenters(model, X_train, y_train, X_val, y_val, Solutions, clust.labels_, m) # 选择最佳聚类中心和对应的解
-        print("Validation MSE:", BSOAlgorithm.modelCheck(model, X_train, y_train, X_val, y_val, Solutions[cCenters[best]])) # 打印验证集上的均方误差（MSE）结果
+        cCenters, best = BSOAlgorithm.selClustCenters(X_train, y_train, X_val, y_val, Solutions, clust.labels_, m) # 选择最佳聚类中心和对应的解
+        print("Validation MSE:", BSOAlgorithm.svrCheck(X_train, y_train, X_val, y_val, Solutions[cCenters[best]])) # 打印验证集上的均方误差（MSE）结果
         return Solutions[cCenters[best]] # 返回最佳聚类中心对应的解
     
     # 不同k值对模型性能的影响
