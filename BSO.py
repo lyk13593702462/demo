@@ -10,10 +10,11 @@ class BSOAlgorithm:
         return (1/(1 + math.exp(-x)))
 
     def svrCheck(X_train, y_train, X_val, y_val, sol):
-        clf = NuSVR(kernel = 'linear', gamma = 'auto', C = sol[0], nu = sol[1])
+#         clf = NuSVR(kernel = 'linear', gamma = 'auto', C = sol[0], nu = sol[1])
+#         clf = SVR(kernel = 'linear', C = sol[0], epsilon = sol[1])
+        clf = SVR(kernel='rbf', C=sol[0], gamma=sol[1], epsilon=sol[2])
         clf.fit(X_train, y_train)
         y_pred = clf.predict(X_val)
-    #     return (mean_squared_error(y_val, y_pred))
         return (mse(y_val, y_pred))
 
     # Brain Storm Optimization,BSO,脑风暴优化算法
@@ -166,8 +167,8 @@ class BSOAlgorithm:
         k = list(range(1,n))
         E = []
         for i in k:
-            best = BSOAlgorithm.bso(model, X_train, y_train, X_val, y_val, 10, i)
+            best = BSOAlgorithm.bso(X_train, y_train, X_val, y_val, 10, i)
             print("Parameters :", best)
-            E.append(BSOAlgorithm.modelCheck(model, X_train, y_train, X_test, y_test, best))
+            E.append(BSOAlgorithm.svrCheck(X_train, y_train, X_test, y_test, best))
             print("Test MSE:", E[i-1])
         plt.plot(k,E)
