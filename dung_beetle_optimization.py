@@ -1,10 +1,13 @@
 import numpy as np
 
+# 边界处理函数
+def Bounds(s, Lb, Ub):
+    temp = s.copy()
+    temp[temp < Lb] = Lb[temp < Lb]
+    temp[temp > Ub] = Ub[temp > Ub]
+    return temp
 
-def bounds(x, lb, ub):
-    return np.clip(x, lb, ub)
-
-
+# 蜣螂算法主函数
 def MSADBO(N, Max_iter, lb, ub, dim, fobj):
     P_percent1 = 0.2
     P_percent2 = 0.4
@@ -13,96 +16,77 @@ def MSADBO(N, Max_iter, lb, ub, dim, fobj):
     pNum2 = round(N * P_percent2)
     pNum3 = round(N * P_percent3)
 
+    # 初始化种群
     Z = np.random.rand(N, dim)
-    lambda_val = 0.4
+    lambda_ = 0.518
+    Z = np.where((Z <= (1 - lambda_)) & (Z > 0), Z / (1 - lambda_), (Z - 1 + lambda_) / lambda_)
+    x = lb + (ub - lb) * Z
+    fit = np.apply_along_axis(fobj, 1, x)
 
-    for i in range(N):
-        for j in range(dim):
-            if 0 < Z[i, j] <= (1 - lambda_val):
-                Z[i, j] = Z[i, j] / (1 - lambda_val)
-            else:
-                Z[i, j] = (Z[i, j] - 1 + lambda_val) / lambda_val
-
-    x = np.zeros((N, dim))
-    fit = np.zeros(N)
-
-    for i in range(N):
-        x[i, :] = lb + (ub - lb) * Z[i, :]
-        fit[i] = fobj(x[i, :])
-
-    pFit = np.copy(fit)
-    pX = np.copy(x)
-    XX = np.copy(pX)
+    pFit = fit.copy()
+    pX = x.copy()
+    XX = pX.copy()
     fMin = np.min(fit)
     bestX = x[np.argmin(fit), :]
 
+    # 开始迭代
     for t in range(Max_iter):
         Wmax = 0.9
         Wmin = 0.782
         r1 = (Wmax - Wmin) / 2 * np.cos(np.pi * t / Max_iter) + (Wmax + Wmin) / 2
         w = Wmax - (Wmax - Wmin) * (t / Max_iter)
-
         worse = x[np.argmax(fit), :]
 
         for i in range(pNum1):
-            if np.random.rand() < 0.5:
+            if np.random.rand(1) < 0.5:
                 b = 0.3
                 k = 0.1
                 r4 = np.random.rand()
                 miu = 0.1
                 a = 1 if r4 > miu else -1
-                x[i, :] = pX[i, :] + b * abs(pX[i, :] - worse) + a * k * (XX[i, :])
+                x[i, :] = pX[i, :] + b * np.abs(pX[i, :] - worse) + a * k * XX[i, :]
             else:
-                for j in range(dim):
-                    r2 = (2 * np.pi) * np.random.rand()
-                    r3 = 2 * np.random.rand()
-                    x[i, j] = w * x[i, j] + (r1 * np.sin(r2) * (r3 * bestX[j] - x[i, j]))
+                r2 = 2 * np.pi * np.random.rand()
+                r3 = 2 * np.random.rand()
+                x[i, :] = w * x[i, :] + (r1 * np.sin(r2) * (r3 * bestX - x[i, :]))
 
-            x[i, :] = bounds(x[i, :], lb, ub)
+            x[i, :] = Bounds(x[i, :], lb, ub)
             fit[i] = fobj(x[i, :])
 
-        bestXX = x[np.argmin(fit), :]
+        bestII = np.argmin(fit)
+        bestXX = x[bestII, :]
         R = 1 - t / Max_iter
-
         Xnew1 = bestXX * (1 - R)
         Xnew2 = bestXX * (1 + R)
-        Xnew1 = bounds(Xnew1, lb, ub)
-        Xnew2 = bounds(Xnew2, lb, ub)
-
+        Xnew1 = Bounds(Xnew1, lb, ub)
+        Xnew2 = Bounds(Xnew2, lb, ub)
         Xnew11 = bestX * (1 - R)
         Xnew22 = bestX * (1 + R)
-        lbnew2 = bounds(Xnew11, lb, ub)
-        ubnew2 = bounds(Xnew22, lb, ub)
+        lbnew2 = Bounds(Xnew11, lb, ub)
+        ubnew2 = Bounds(Xnew22, lb, ub)
 
         for i in range(pNum1, pNum2):
-            x[i, :] = bestXX + (np.random.rand(1, dim) * (pX[i, :] - Xnew1) +
-                                np.random.rand(1, dim) * (pX[i, :] - Xnew2))
-            x[i, :] = bounds(x[i, :], Xnew1, Xnew2)
+            x[i, :] = bestXX + (np.random.rand(1, dim) * (pX[i, :] - Xnew1) + np.random.rand(1, dim) * (pX[i, :] - Xnew2))
+            x[i, :] = Bounds(x[i, :], Xnew1, Xnew2)
             fit[i] = fobj(x[i, :])
 
         for i in range(pNum2, pNum3):
-            x[i, :] = pX[i, :] + (np.random.randn(1) * (pX[i, :] - lbnew2) +
-                                  np.random.rand(1, dim) * (pX[i, :] - ubnew2))
-            x[i, :] = bounds(x[i, :], lb, ub)
+            x[i, :] = pX[i, :] + (np.random.randn(1) * (pX[i, :] - lbnew2) + (np.random.rand(1, dim) * (pX[i, :] - ubnew2)))
+            x[i, :] = Bounds(x[i, :], lb, ub)
             fit[i] = fobj(x[i, :])
 
-        s = 1
         for j in range(pNum3, N):
-            x[j, :] = bestX + s * np.random.randn(1, dim) * ((abs(pX[j, :] - bestXX)) +
-                                                             abs(pX[j, :] - bestX)) / 2
-            x[j, :] = bounds(x[j, :], lb, ub)
+            s = 1
+            x[j, :] = bestX + s * np.random.randn(1, dim) * ((np.abs(pX[j, :] - bestXX)) + (np.abs(pX[j, :] - bestX))) / 2
+            x[j, :] = Bounds(x[j, :], lb, ub)
             fit[j] = fobj(x[j, :])
 
-        XX = np.copy(pX)
+        XX = pX.copy()
         for i in range(N):
-            if fit[i] < pFit[i]:
-                pFit[i] = fit[i]
-                pX[i, :] = x[i, :]
-
             w1 = t / Max_iter
             w2 = 1 - t / Max_iter
             x[i, :] = pX[i, :] * (1 + w1 * np.random.randn() + w2 * np.tan((np.random.rand() - 1 / 2) * np.pi))
-            x[i, :] = bounds(x[i, :], lb, ub)
+            x[i, :] = Bounds(x[i, :], lb, ub)
             fit[i] = fobj(x[i, :])
 
             if fit[i] < pFit[i]:
